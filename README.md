@@ -80,6 +80,25 @@ The script will:
 - Convert colors to the correct format
 - Save the modified data back to the world
 
+### Import modes
+
+When importing an image you can choose how the image is fitted to the 48x32 flag canvas using the `--mode` option (default: `stretch`):
+
+- `stretch` (default): the image is resized to exactly 48x32 and may be distorted if the aspect ratio differs. This is the original behavior of the tool.
+- `pad`: the image is scaled to fit inside 48x32 while preserving its aspect ratio, then centered on a black background (letterbox/pillarbox) to fill the remaining area.
+
+Examples:
+
+Stretch (default):
+```bash
+python flag_editor.py /path/to/saves/YourWorld --import 0 --image custom_flag.png
+```
+
+Pad (preserve aspect ratio, black background):
+```bash
+python flag_editor.py /path/to/saves/YourWorld --import 0 --image custom_flag.png --mode pad
+```
+
 ## How It Works
 
 ### NBT Structure

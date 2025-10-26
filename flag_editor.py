@@ -136,30 +136,49 @@ class FlagData:
         return img
     
     @classmethod
-    def from_image(cls, img: Image.Image, target_width: int = 48, target_height: int = 32) -> 'FlagData':
-        """Create flag data from PIL Image, resizing if necessary."""
+    def from_image(cls, img: Image.Image, target_width: int = 48, target_height: int = 32,
+                   preserve_aspect: bool = False) -> 'FlagData':
+        """Create flag data from PIL Image.
+
+        If preserve_aspect is False (default), the image is resized/stretched to exactly
+        target dimensions (current behavior). If True, the image is scaled to fit while
+        preserving aspect ratio and pasted centered onto a black background of the
+        target size.
+        """
         # Convert to RGB if needed
         if img.mode != 'RGB':
             img = img.convert('RGB')
-        
-        # Resize to target dimensions (always 48x32)
-        if img.size != (target_width, target_height):
-            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
-        
+
+        if preserve_aspect:
+            # Scale preserving aspect ratio and paste onto black background
+            # Make a copy so we don't mutate the original
+            working = img.copy()
+            working.thumbnail((target_width, target_height), Image.Resampling.LANCZOS)
+
+            background = Image.new('RGB', (target_width, target_height), (0, 0, 0))
+            offset_x = (target_width - working.width) // 2
+            offset_y = (target_height - working.height) // 2
+            background.paste(working, (offset_x, offset_y))
+            img_to_sample = background
+        else:
+            # Stretch to fill target dimensions (existing behavior)
+            if img.size != (target_width, target_height):
+                img_to_sample = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+            else:
+                img_to_sample = img
+
         flag = cls(target_width, target_height)
-        
+
         for x in range(target_width):
             for y in range(target_height):
-                # getpixel may return an int for single-channel images or a tuple for RGB.
-                # Tell the type checker this will be an RGB triplet after conversion
-                pixel = cast(Tuple[int, int, int], img.getpixel((x, y)))
+                # getpixel will be an RGB triplet after conversion
+                pixel = cast(Tuple[int, int, int], img_to_sample.getpixel((x, y)))
                 r, g, b = pixel
                 # Convert unsigned byte (0-255) to signed byte (-128 to 127)
-                # Values 0-127 stay the same, 128-255 become -128 to -1
                 flag.colors[x][y][0] = r if r < 128 else r - 256
                 flag.colors[x][y][1] = g if g < 128 else g - 256
                 flag.colors[x][y][2] = b if b < 128 else b - 256
-        
+
         return flag
 
 
@@ -358,7 +377,8 @@ class SpaceRaceEditor:
         img.save(output_path)
         print(f"Flag exported to {output_path}")
     
-    def import_flag(self, race_index: int, image_path: str, width: int = 48, height: int = 32):
+    def import_flag(self, race_index: int, image_path: str, width: int = 48, height: int = 32,
+                    preserve_aspect: bool = False):
         """Import an image as a space race flag."""
         if race_index < 0 or race_index >= len(self.space_races):
             raise ValueError(f"Invalid race index: {race_index}")
@@ -377,7 +397,7 @@ class SpaceRaceEditor:
             import io
             # Ensure cairosvg is available (static analyzer) and that svg2png returns bytes
             assert cairosvg is not None, "cairosvg must be available for SVG conversion"
-            png_data = cast(bytes, cairosvg.svg2png(url=image_path, output_width=48, output_height=32))
+            png_data = cast(bytes, cairosvg.svg2png(url=image_path))
             if png_data is None:
                 raise RuntimeError("Failed to render SVG to PNG")
             img = Image.open(io.BytesIO(png_data))
@@ -385,8 +405,9 @@ class SpaceRaceEditor:
             img = Image.open(image_path)
         
         race = self.space_races[race_index]
-        race.flag_data = FlagData.from_image(img, 48, 32)
-        print(f"Flag imported from {image_path} and resized to 48x32")
+        race.flag_data = FlagData.from_image(img, 48, 32, preserve_aspect=preserve_aspect)
+        mode_str = 'pad (preserve aspect ratio, black background)' if preserve_aspect else 'stretch (fill target size)'
+        print(f"Flag imported from {image_path} using mode: {mode_str}")
         print(f"Applied to Space Race #{race.space_race_id}: {race.team_name}")
 
 
@@ -414,6 +435,8 @@ Examples:
                        help='Import flag to space race at INDEX')
     parser.add_argument('--output', '-o', help='Output file path for export')
     parser.add_argument('--image', '-i', help='Input image file path for import')
+    parser.add_argument('--mode', choices=['stretch', 'pad'], default='stretch',
+                        help="Scaling mode when importing: 'stretch' (default) stretches to fill 48x32; 'pad' scales preserving aspect ratio and pads with black")
     
     args = parser.parse_args()
     
@@ -435,8 +458,9 @@ Examples:
             if not args.image:
                 print("Error: --image is required when importing a flag")
                 sys.exit(1)
-            
-            editor.import_flag(args.import_flag, args.image)
+
+            preserve_aspect = (args.mode == 'pad')
+            editor.import_flag(args.import_flag, args.image, preserve_aspect=preserve_aspect)
             editor.save()
             print("\nDone! Remember to backup your world before using the modified save.")
         
