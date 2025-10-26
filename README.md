@@ -43,14 +43,14 @@ SPACE RACES
 
 [0] Space Race #1: Team Alpha
   Players: Steve, Alex
-  Flag Size: 20x14
+  Flag Size: 48x32
   Team Color: RGB(1.00, 0.50, 0.25)
   Celestial Bodies Visited: planet.moon, planet.mars
   Ticks Spent: 123456
 
 [1] Space Race #2: Team Beta
   Players: Notch
-  Flag Size: 20x14
+  Flag Size: 48x32
   Team Color: RGB(0.25, 0.75, 1.00)
   Celestial Bodies Visited: planet.moon
   Ticks Spent: 78910
@@ -76,17 +76,9 @@ python flag_editor.py /path/to/saves/YourWorld --import 0 --image custom_flag.pn
 ```
 
 The script will:
-- Automatically resize your image to 20x14 pixels (Galacticraft's flag dimensions)
+- Automatically resize your image to 48x32 pixels (Galacticraft's flag dimensions)
 - Convert colors to the correct format
 - Save the modified data back to the world
-
-### Custom Dimensions
-
-If you want to use different flag dimensions:
-
-```bash
-python flag_editor.py /path/to/saves/YourWorld --import 0 --image flag.png --width 20 --height 14
-```
 
 ## How It Works
 

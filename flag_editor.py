@@ -17,7 +17,7 @@ import sys
 import os
 import argparse
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple
+from typing import List, Dict, Optional, Tuple, cast
 
 try:
     import nbtlib
@@ -32,10 +32,12 @@ except ImportError:
     print("Error: Pillow is required. Install it with: pip install Pillow")
     sys.exit(1)
 
+cairosvg = None
 try:
     import cairosvg
     SVG_SUPPORT = True
 except ImportError:
+    cairosvg = None
     SVG_SUPPORT = False
 
 
@@ -148,7 +150,10 @@ class FlagData:
         
         for x in range(target_width):
             for y in range(target_height):
-                r, g, b = img.getpixel((x, y))
+                # getpixel may return an int for single-channel images or a tuple for RGB.
+                # Tell the type checker this will be an RGB triplet after conversion
+                pixel = cast(Tuple[int, int, int], img.getpixel((x, y)))
+                r, g, b = pixel
                 # Convert unsigned byte (0-255) to signed byte (-128 to 127)
                 # Values 0-127 stay the same, 128-255 become -128 to -1
                 flag.colors[x][y][0] = r if r < 128 else r - 256
@@ -370,7 +375,11 @@ class SpaceRaceEditor:
             
             # Convert SVG to PNG in memory (always 48x32)
             import io
-            png_data = cairosvg.svg2png(url=image_path, output_width=48, output_height=32)
+            # Ensure cairosvg is available (static analyzer) and that svg2png returns bytes
+            assert cairosvg is not None, "cairosvg must be available for SVG conversion"
+            png_data = cast(bytes, cairosvg.svg2png(url=image_path, output_width=48, output_height=32))
+            if png_data is None:
+                raise RuntimeError("Failed to render SVG to PNG")
             img = Image.open(io.BytesIO(png_data))
         else:
             img = Image.open(image_path)
